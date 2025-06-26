@@ -88,7 +88,8 @@ def train_test():
             recall = recall_score(targets_flat, preds_flat, average=None, zero_division=0)
 
 
-            model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet", input_example=batch)
+            model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet", 
+                                                  input_example=dict(imgs=batch['imgs'], chn_ids=batch['chn_ids']))
             mlflow.log_params(parameters)
             # Log classwise metrics
             mlflow.log_metric("loss", loss.item(), step=epoch, model_id=model_info.model_id)
