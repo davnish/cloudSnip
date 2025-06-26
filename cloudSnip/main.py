@@ -19,7 +19,7 @@ parameters = dict(
     batch_size = 8,
 )
 
-mlflow.set_tracking_uri("https://895b-2406-7400-56-dc7-705d-876e-de82-b0f9.ngrok-free.app")
+mlflow.set_tracking_uri("https://user:12345678@8https://9cfe-2406-7400-56-dc7-5453-2e95-e633-1486.ngrok-free.app")
 mlflow.set_experiment("cloudSnip")
 
 def collate_fn(samples):
@@ -35,8 +35,9 @@ val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
 val_dataloader = DataLoader(val_dataset, batch_size=8, sampler=val_sampler, collate_fn=collate_fn)
 
 
-uncompiled_model = PanopticonUNet(in_ch=768, num_classes=3)
-model = torch.compile(uncompiled_model)
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = PanopticonUNet(in_ch=768, num_classes=3)
+# model = torch.compile(uncompiled_model)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=parameters['lr'], weight_decay=parameters['weight_decay'])
 criterion = nn.CrossEntropyLoss()   
@@ -83,11 +84,11 @@ def train_test():
 
             f1 = f1_score(targets_flat, preds_flat, average="macro")
             # Classwise precision and recall
-            precision = precision_score(targets_flat, preds_flat, average=None)
-            recall = recall_score(targets_flat, preds_flat, average=None)
+            precision = precision_score(targets_flat, preds_flat, average=None, zero_division=0)
+            recall = recall_score(targets_flat, preds_flat, average=None, zero_division=0)
 
 
-            model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet")
+            model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet", input_example=batch)
             mlflow.log_params(parameters)
             # Log classwise metrics
             mlflow.log_metric("loss", loss.item(), step=epoch, model_id=model_info.model_id)
