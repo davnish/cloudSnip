@@ -19,7 +19,7 @@ parameters = dict(
     batch_size = 8,
 )
 
-mlflow.set_tracking_uri("https://user:12345678@8https://9cfe-2406-7400-56-dc7-5453-2e95-e633-1486.ngrok-free.app")
+mlflow.set_tracking_uri("https://infinite-clear-moose.ngrok-free.app")
 mlflow.set_experiment("cloudSnip")
 
 def collate_fn(samples):
