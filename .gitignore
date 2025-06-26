@@ -12,7 +12,11 @@ wheels/
 # .ds_store
 .DS_store
 
-
+# mlflow
+mlruns/
 
 # data
 /data
+
+# model
+/model
