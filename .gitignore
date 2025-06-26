@@ -14,6 +14,7 @@ wheels/
 
 # mlflow
 mlruns/
+mlartifacts/
 
 # data
 /data
