@@ -17,8 +17,8 @@ import numpy as np
 parameters = dict(
     lr = 1e-4,
     weight_decay = 1e-4,
-    epochs = 50,
-    batch_size = 32,
+    epochs = 150,
+    batch_size = 64,
     length = 10000,
 )
 
@@ -42,13 +42,14 @@ val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sa
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 model = PanopticonUNet(in_ch=768, num_classes=3).to(device)
-model = torch.compile(model)
+# model = torch.compile(model)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=parameters['lr'], weight_decay=parameters['weight_decay'])
+schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
 criterion = nn.CrossEntropyLoss()   
 
 def train_test():
-    with mlflow.start_run(run_name="inc_length_workers_batch_size"):
+    with mlflow.start_run(run_name="inc_epoch200_lrscheduler_batch_size64"):
         for epoch in range(parameters['epochs']):
             st = time.time()
             model.train()
@@ -122,6 +123,7 @@ def train_test():
             print(f"Epoch [{epoch+1}/{parameters['epochs']}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, F1 Score: {f1:.4f}")
             print(f"Precision: {precision}, Recall: {recall}, Accuracy: {accuracy:.4f}")
             print(f"Time: {ed-st:.2f}s")
+            schedule.step()
 
 if __name__ == "__main__":
     train_test()

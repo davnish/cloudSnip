@@ -51,7 +51,7 @@ class PanopticonUNet(nn.Module):
         self.decoder = UNetDecoder(in_ch, num_classes)
     
     def forward(self, x):
-        img = x['imgs']
+        # img = x['imgs']
         x = self.encoder.forward_features(x)
         # B, 257, 768 -> B, 768, 16, 16
         # print(x)
