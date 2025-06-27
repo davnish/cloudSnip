@@ -9,8 +9,10 @@ class DecoderBlock(nn.Module):
         self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True)
         )
 
@@ -40,16 +42,19 @@ class PanopticonUNet(nn.Module):
     def __init__(self, in_ch=3, num_classes=3):
         super().__init__()
         encoder = panopticon_vitb14(weights=Panopticon_Weights.VIT_BASE14, img_size=224)
+        
         for param in encoder.parameters():
                 param.requires_grad = False
+
         self.encoder = encoder.model
 
         self.decoder = UNetDecoder(in_ch, num_classes)
     
     def forward(self, x):
-
+        img = x['imgs']
         x = self.encoder.forward_features(x)
         # B, 257, 768 -> B, 768, 16, 16
+        # print(x)
         x = x[:, 1:,:].permute(0, 2, 1).reshape(x.shape[0], -1, 16, 16)
         x = self.decoder(x)
         return x
@@ -58,4 +63,18 @@ if __name__ == "__main__":
     import torch
     # Example usage
     model = PanopticonUNet(in_ch=768, num_classes=3)
-    model = torch.compile(model, fullgraph=True)
+
+    img = torch.randn(1,3,224,224)
+    img[0, 0, 0, 0] = torch.nan # Introduce a NaN value for testing
+    chn_ids = torch.tensor([842, 665, 560]).repeat(1, 1)
+    data = torch.nan
+    # print(type(data))
+    data = {
+        'imgs': img,
+        # 'imgages': img,
+        'chn_ids': chn_ids
+    }
+    # model = torch.compile(model, fullgraph=True)
+
+    output = model(data)
+    print(output)

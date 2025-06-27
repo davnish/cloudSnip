@@ -1,10 +1,14 @@
 from torchgeo.datasets import RasterDataset
-from torchvision.transforms import Compose, ToTensor, Normalize
+import torch
+from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
+# from torchvision.transforms import Compose, ToTensor, Normalize, 
+# from torchvision.transforms import Lambda
 
 transforms = Compose([
-    ToTensor(), 
-    Normalize(mean=[0.485, 0.456, 0.406], 
-              std=[0.229, 0.224, 0.225])
+    ToTensor(),
+    # Lambda(lambda x: torch.nan_to_num(x, nan=0.0)),
+    Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
+              std=[0.16295877, 0.17293826, 0.15380774])
 ])
 
 class Liss4(RasterDataset):
@@ -16,6 +20,16 @@ class Liss4(RasterDataset):
     separate_files = False
     transforms = transforms
 
+    def __getitem__(self, query):
+        sample = super().__getitem__(query)
+
+        # if "imgs" in sample:
+        image = sample["image"]
+        image = torch.nan_to_num(image, nan=0.0)
+        sample['chn_ids'] = torch.tensor([842, 665, 560])
+        sample["imgs"] = image
+        return sample
+
 class Liss4_GT(RasterDataset):
     filename_glob = '*.tif'
     filename_regex = r'^.{3}(?P<date>\d{2}[A-Z]{3}\d{4})'
@@ -23,6 +37,14 @@ class Liss4_GT(RasterDataset):
     single_band = False
     is_image = False
     separate_files = False
+
+    def __getitem__(self, query):
+        sample = super().__getitem__(query)
+        mask = sample["mask"]
+        mask = torch.nan_to_num(mask, nan=0.0)
+        mask = torch.where(mask < 0, torch.tensor(0, dtype=torch.int64), mask)
+        sample["mask"] = mask
+        return sample
 
 
 train_img = Liss4("data/unprocessed_data/train/img")

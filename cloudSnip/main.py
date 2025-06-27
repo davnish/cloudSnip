@@ -1,4 +1,4 @@
-import mlflow.pytorch
+# import mlflow.pytorch
 import torch
 import torch.nn as nn
 from model import PanopticonUNet
@@ -11,63 +11,79 @@ import mlflow
 import tqdm
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.metrics import precision_score, recall_score
+from mlflow.models.signature import infer_signature
+import numpy as np
 
 parameters = dict(
     lr = 1e-4,
     weight_decay = 1e-4,
-    epochs = 10,
-    batch_size = 8,
+    epochs = 50,
+    batch_size = 32,
+    length = 10000,
 )
 
-mlflow.set_tracking_uri("https://infinite-clear-moose.ngrok-free.app")
-mlflow.set_experiment("cloudSnip")
+mlflow.login()
+# mlflow.set_tracking_uri("https://infinite-clear-moose.ngrok-free.app")
+mlflow.set_experiment("/Users/nischal.singh38@gmail.com/cloudSnip")
 
-def collate_fn(samples):
-    sample = stack_samples(samples)
-    sample['imgs'] = sample['image']
-    sample['chn_ids'] = torch.tensor([842, 665, 560]).repeat(parameters['batch_size'], 1)
-    return sample
+# input_example = {
+#     'imgs': np.random.randn(8, 3, 224, 224),  # Example input tensor
+#     'chn_ids': np.array([842, 665, 560]).repeat(8)  # Example channel IDs
+# }
+# output_example = np.random.randn(8, 3, 224, 224)  # Example output tensor
+# signature = infer_signature(input_example, output_example) 
 
-train_sampler = RandomGeoSampler(train_dataset, size=224, length=1000)
-train_dataloader = DataLoader(train_dataset, batch_size=8, sampler=train_sampler, collate_fn=collate_fn)
+train_sampler = RandomGeoSampler(train_dataset, size=224, length=parameters['length'])
+train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4)
 
 val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
-val_dataloader = DataLoader(val_dataset, batch_size=8, sampler=val_sampler, collate_fn=collate_fn)
+val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4)
 
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = PanopticonUNet(in_ch=768, num_classes=3)
-# model = torch.compile(uncompiled_model)
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+model = PanopticonUNet(in_ch=768, num_classes=3).to(device)
+model = torch.compile(model)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=parameters['lr'], weight_decay=parameters['weight_decay'])
 criterion = nn.CrossEntropyLoss()   
 
 def train_test():
-    with mlflow.start_run():
+    with mlflow.start_run(run_name="inc_length_workers_batch_size"):
         for epoch in range(parameters['epochs']):
             st = time.time()
             model.train()
+            train_loss = 0.0
             for batch in tqdm.tqdm(train_dataloader):
-                masks = batch['mask'].squeeze()
-                
+                masks = batch['mask'].squeeze().to(device)
+
+                batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+
                 optimizer.zero_grad()
                 outputs = model(batch)
-                
                 loss = criterion(outputs, masks.long())
                 loss.backward()
                 optimizer.step()
+                train_loss += loss.detach().cpu().item()
+            train_loss /= len(train_dataloader)
 
             # validation
             list_outputs = []
             list_masks = []
+            val_loss = 0.0
             with torch.no_grad():
                 model.eval()
                 for batch in tqdm.tqdm(val_dataloader):
-                    masks = batch['mask'].squeeze()
+                    masks = batch['mask'].squeeze().to(device)
+                    batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+
                     outputs = model(batch)
-                    # loss = criterion(outputs, masks.long())
-                    list_outputs.append(outputs)
-                    list_masks.append(masks)
+                    loss = criterion(outputs, masks.long())
+
+                    list_outputs.append(outputs.detach().cpu())
+                    list_masks.append(masks.detach().cpu())
+
+                    val_loss += loss.detach().cpu().item()
+            val_loss /= len(val_dataloader)
             ed = time.time()
 
             # Concatenate all outputs and masks
@@ -86,22 +102,26 @@ def train_test():
             # Classwise precision and recall
             precision = precision_score(targets_flat, preds_flat, average=None, zero_division=0)
             recall = recall_score(targets_flat, preds_flat, average=None, zero_division=0)
+            accuracy = accuracy_score(targets_flat, preds_flat)
 
-
-            model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet", 
-                                                  input_example=dict(imgs=batch['imgs'].numpy(), chn_ids=batch['chn_ids'].numpy()))
+            # signature = infer_signature(input_example.numpy(), outputs.detach().cpu().numpy())
+            # model_info = mlflow.pytorch.log_model(model, "workspace.default.v1", registered_model_name="PanopticonUNet", signature=signature)
             mlflow.log_params(parameters)
             # Log classwise metrics
-            mlflow.log_metric("loss", loss.item(), step=epoch, model_id=model_info.model_id)
+
+            mlflow.log_metric("val_loss", val_loss, step=epoch)
+            mlflow.log_metric("train_loss", train_loss, step=epoch)
             for i, (p, r) in enumerate(zip(precision, recall)):
-                mlflow.log_metric(f"precision_class_{i}", p, step=epoch, model_id=model_info.model_id)
-                mlflow.log_metric(f"recall_class_{i}", r, step=epoch, model_id=model_info.model_id)
-            acc = accuracy_score(targets_flat, preds_flat)
-            mlflow.log_metric("f1_score", f1, step=epoch, model_id=model_info.model_id)
-            mlflow.log_metric("accuracy", acc, step=epoch, model_id=model_info.model_id)
+                mlflow.log_metric(f"precision_class_{i}", p, step=epoch)
+                mlflow.log_metric(f"recall_class_{i}", r, step=epoch)
+
+            mlflow.log_metric("f1_score", f1, step=epoch)
+            mlflow.log_metric("accuracy", accuracy, step=epoch)
             mlflow.log_metric("epoch", epoch)
 
-        print(f"Epoch [{epoch+1}/{parameters['epochs']}], Loss: {loss.item():.4f}, Time: {ed-st:.2f}s")
+            print(f"Epoch [{epoch+1}/{parameters['epochs']}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, F1 Score: {f1:.4f}")
+            print(f"Precision: {precision}, Recall: {recall}, Accuracy: {accuracy:.4f}")
+            print(f"Time: {ed-st:.2f}s")
 
 if __name__ == "__main__":
     train_test()

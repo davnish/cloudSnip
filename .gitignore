@@ -22,3 +22,4 @@ mlflow.db
 
 # model
 /model
+panopticon_unet.pth

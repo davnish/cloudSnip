@@ -3,5 +3,5 @@ authtoken: 2z3I18q5t9j2mzE8z6bwAhYnTgE_4WntodZCDF1nofQebQwAS
 tunnels:
   mlflow:
     proto: http
-    addr: 8083
+    addr: 8082
     domain: infinite-clear-moose.ngrok-free.app
