@@ -4,7 +4,7 @@ from torchgeo.models import panopticon_vitb14, Panopticon_Weights
 from typing import Optional
 import torch
 from typing import Optional, Union, List, Tuple
-from torchgeo.models import Panopticon
+# from torchgeo.models import Panopticon
 
 class DoubleConv(nn.Module):
     def __init__(self, in_ch, out_ch, dprob=0.2):

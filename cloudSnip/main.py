@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 from model import PanopticonUNet
-from dataset import train_dataset, val_dataset
+from dataset import train_dataset, val_dataset, NoDataAware_RandomSampler
 from torch.utils.data import DataLoader
 import time
 from torchgeo.samplers import RandomGeoSampler, GridGeoSampler
@@ -36,7 +36,7 @@ def objective(trial):
         length = length,
     )
 
-    train_sampler = RandomGeoSampler(train_dataset, size=224, length=parameters['length'])
+    train_sampler = NoDataAware_RandomSampler(train_dataset, size=224, length=parameters['length'], nodata_value=0, max_nodata_ratio=0.4)
     train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4)
 
     val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)

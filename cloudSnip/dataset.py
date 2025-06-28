@@ -1,6 +1,7 @@
 from torchgeo.datasets import RasterDataset
 import torch
-from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
+from torchvision.transforms import Compose, ToTensor, Normalize, 
+from torchgeo.samplers import RandomGeoSampler
 # from torchvision.transforms import Compose, ToTensor, Normalize, 
 # from torchvision.transforms import Lambda
 
@@ -10,6 +11,36 @@ transforms = Compose([
     Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
               std=[0.16295877, 0.17293826, 0.15380774])
 ])
+
+class NoDataAware_RandomSampler(RandomGeoSampler):
+    def __init__(self, dataset, size, length, nodata_value=0, max_nodata_ratio=0.4, **kwargs):
+        super().__init__(dataset, size, length, **kwargs)
+        self.nodata_value = nodata_value
+        self.max_nodata_ratio = max_nodata_ratio
+        self.dataset = dataset
+    
+    def __iter__(self):
+        generated = 0
+        while generated < self.length:
+            # Get a random query from parent sampler
+            query = next(super().__iter__())
+            
+            try:
+                # Check the sample for nodata
+                sample = self.dataset[query]
+                if 'mask' in sample:
+                    mask = sample['mask']
+                    nodata_ratio = (mask == self.nodata_value).float().mean().item()
+                    # Skip if too much nodata
+                    if nodata_ratio >= self.max_nodata_ratio:
+                        continue
+                
+                yield query
+                generated += 1
+            except Exception as e:
+                # Skip problematic samples
+                print(f"Skipping sample {query} due to error: {e}")
+                continue
 
 class Liss4(RasterDataset):
     filename_glob = '*.tif'
