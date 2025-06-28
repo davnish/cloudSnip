@@ -18,8 +18,8 @@ parameters = dict(
     lr = 1e-4,
     weight_decay = 1e-4,
     epochs = 150,
-    batch_size = 64,
-    length = 10000,
+    batch_size = 32,
+    length = 2000,
 )
 
 mlflow.login()
@@ -40,8 +40,8 @@ val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
 val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4)
 
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-model = PanopticonUNet(in_ch=768, num_classes=3).to(device)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = PanopticonUNet(num_classes=3).to(device)
 # model = torch.compile(model)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=parameters['lr'], weight_decay=parameters['weight_decay'])
@@ -49,7 +49,7 @@ schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
 criterion = nn.CrossEntropyLoss()   
 
 def train_test():
-    with mlflow.start_run(run_name="inc_epoch50_dropout0.5"):
+    with mlflow.start_run(run_name="im_v4_norm_bitfit") as run:
         for epoch in range(parameters['epochs']):
             st = time.time()
             model.train()
