@@ -49,7 +49,7 @@ schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
 criterion = nn.CrossEntropyLoss()   
 
 def train_test():
-    with mlflow.start_run(run_name="inc_epoch200_lrscheduler_batch_size64"):
+    with mlflow.start_run(run_name="inc_epoch50_dropout0.5"):
         for epoch in range(parameters['epochs']):
             st = time.time()
             model.train()
