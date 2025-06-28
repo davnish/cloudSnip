@@ -7,7 +7,7 @@ from typing import Optional, Union, List, Tuple
 from torchgeo.models import Panopticon
 
 class DoubleConv(nn.Module):
-    def __init__(self, in_ch, out_ch, dprob=0.35):
+    def __init__(self, in_ch, out_ch, dprob=0.2):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
@@ -23,9 +23,9 @@ class DoubleConv(nn.Module):
         return self.conv(x)
 
 class DecoderBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, dprob=0.35):
+    def __init__(self, in_ch, out_ch, dprob=0.2):
         super().__init__()
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.up = nn.ConvTranspose2d(in_ch, in_ch, kernel_size=2, stride=2)
         self.conv = DoubleConv(in_ch, out_ch, dprob)
 
     def forward(self, x):
@@ -52,8 +52,6 @@ class UNetDecoder(nn.Module):
         x = self.dec2(x)  # 56x56 → 112x112
 
         x = self.dec3(x)  # 112x112 → 224x224
-
-        # x = self.dec4(x)  # 256x256 → 512x512
         return x
     
 class PanopticonUNet(nn.Module):

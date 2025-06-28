@@ -13,44 +13,46 @@ from sklearn.metrics import f1_score, accuracy_score
 from sklearn.metrics import precision_score, recall_score
 from mlflow.models.signature import infer_signature
 import numpy as np
-
-parameters = dict(
-    lr = 1e-4,
-    weight_decay = 1e-4,
-    epochs = 150,
-    batch_size = 32,
-    length = 2000,
-)
+import optuna
 
 mlflow.login()
-# mlflow.set_tracking_uri("https://infinite-clear-moose.ngrok-free.app")
-mlflow.set_experiment("/Users/nischal.singh38@gmail.com/cloudSnip")
 
-# input_example = {
-#     'imgs': np.random.randn(8, 3, 224, 224),  # Example input tensor
-#     'chn_ids': np.array([842, 665, 560]).repeat(8)  # Example channel IDs
-# }
-# output_example = np.random.randn(8, 3, 224, 224)  # Example output tensor
-# signature = infer_signature(input_example, output_example) 
-
-train_sampler = RandomGeoSampler(train_dataset, size=224, length=parameters['length'])
-train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4)
-
-val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
-val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4)
+mlflow.set_experiment("/Users/nischal.singh38@gmail.com/cloudSnip_convtranspose2d")
 
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = PanopticonUNet(num_classes=3).to(device)
-# model = torch.compile(model)
+def objective(trial):
+    # Define the hyperparameters to optimize
+    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-2, log=True)
+    epochs = trial.suggest_int('epochs', 50, 200)
+    batch_size = trial.suggest_int('batch_size', 16, 64)
+    length = trial.suggest_int('length', 1000, 5000)
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=parameters['lr'], weight_decay=parameters['weight_decay'])
-schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
-criterion = nn.CrossEntropyLoss()   
+    parameters = dict(
+        lr = lr,
+        weight_decay = weight_decay,
+        epochs = epochs,
+        batch_size = batch_size,
+        length = length,
+    )
 
-def train_test():
-    with mlflow.start_run(run_name="im_v4_norm_bitfit") as run:
-        for epoch in range(parameters['epochs']):
+    train_sampler = RandomGeoSampler(train_dataset, size=224, length=parameters['length'])
+    train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4)
+
+    val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
+    val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4)
+
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    model = PanopticonUNet(num_classes=3).to(device)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
+    schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    criterion = nn.CrossEntropyLoss()
+
+
+
+    with mlflow.start_run(nested=True) as run:
+        for epoch in range(epochs):
             st = time.time()
             model.train()
             train_loss = 0.0
@@ -106,12 +108,13 @@ def train_test():
             accuracy = accuracy_score(targets_flat, preds_flat)
 
             # signature = infer_signature(input_example.numpy(), outputs.detach().cpu().numpy())
-            # model_info = mlflow.pytorch.log_model(model, "workspace.default.v1", registered_model_name="PanopticonUNet", signature=signature)
+            # model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet", signature=signature)
             mlflow.log_params(parameters)
             # Log classwise metrics
 
             mlflow.log_metric("val_loss", val_loss, step=epoch)
             mlflow.log_metric("train_loss", train_loss, step=epoch)
+
             for i, (p, r) in enumerate(zip(precision, recall)):
                 mlflow.log_metric(f"precision_class_{i}", p, step=epoch)
                 mlflow.log_metric(f"recall_class_{i}", r, step=epoch)
@@ -125,9 +128,28 @@ def train_test():
             print(f"Time: {ed-st:.2f}s")
             schedule.step()
 
+            trial.report(val_loss, epoch)
+
+            if trial.should_prune():
+                mlflow.log_param("pruned", True)
+                raise optuna.exceptions.TrialPruned()
+            
+
+        model_path = f"models/trial_{trial.number}.pth"
+        torch.save(model.state_dict(), model_path)
+        mlflow.log_param("model_path", model_path)
+        # mlflow.pytorch.log_model(model, artifact_path="model")
+    return val_loss
+
 if __name__ == "__main__":
-    train_test()
-    print("Training complete.")
-    # Save the model
-    torch.save(model.state_dict(), "panopticon_unet.pth")
-    print("Model saved as panopticon_unet.pth")
+
+    study = optuna.create_study(direction='minimize',
+                                pruner=optuna.pruners.MedianPruner(n_warmup_steps=1))  # or 'maximize' if using accuracy directly
+    study.optimize(objective, n_trials=20)
+
+    print("Best Trial:")
+    trial = study.best_trial
+    print(f"  Value: {trial.value:.4f}")
+    print("  Params:")
+    for key, value in trial.params.items():
+        print(f"    {key}: {value}")
