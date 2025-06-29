@@ -5,54 +5,52 @@ from model import PanopticonUNet
 from dataset import train_dataset, val_dataset, NoDataAware_RandomSampler
 from torch.utils.data import DataLoader
 import time
-from torchgeo.samplers import RandomGeoSampler, GridGeoSampler
+from torchgeo.samplers import GridGeoSampler
 from torchgeo.datasets import stack_samples
 import mlflow
 import tqdm
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.metrics import precision_score, recall_score
-from mlflow.models.signature import infer_signature
-import numpy as np
 import optuna
+from loss import CloudShadowLoss
+from pathlib import Path
 
 mlflow.login()
 
-mlflow.set_experiment("/Users/nischal.singh38@gmail.com/cloudSnip_convtranspose2d")
+experiment_name = "w_bitfit"
+mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 
-def objective(trial):
+def objective():
     # Define the hyperparameters to optimize
-    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-2, log=True)
-    epochs = trial.suggest_int('epochs', 50, 200)
-    batch_size = trial.suggest_int('batch_size', 16, 64)
-    length = trial.suggest_int('length', 1000, 5000)
-
     parameters = dict(
-        lr = lr,
-        weight_decay = weight_decay,
-        epochs = epochs,
-        batch_size = batch_size,
-        length = length,
+        lr = 8e-3,
+        weight_decay = 5e-4,
+        epochs = 200,
+        batch_size = 32,
+        length = 3000,
+        step_size = 10,
+        val_length = 600,
     )
 
     train_sampler = NoDataAware_RandomSampler(train_dataset, size=224, length=parameters['length'], nodata_value=0, max_nodata_ratio=0.4)
-    train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4)
-
-    val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
-    val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4)
+    train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4, drop_last=True)
+    val_sampler = NoDataAware_RandomSampler(val_dataset, size=224, length=parameters['val_length'], nodata_value=0, max_nodata_ratio=0.4)
+    val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4, drop_last=True)
 
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     model = PanopticonUNet(num_classes=3).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
-    schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    criterion = nn.CrossEntropyLoss()
-
-
+    schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=parameters['step_size'], gamma=0.5)
+    criterion = CloudShadowLoss()
 
     with mlflow.start_run(nested=True) as run:
-        for epoch in range(epochs):
+        for k, v in parameters.items():
+            mlflow.log_param(k, v)
+
+        for epoch in range(parameters['epochs']):
+
             st = time.time()
             model.train()
             train_loss = 0.0
@@ -109,7 +107,6 @@ def objective(trial):
 
             # signature = infer_signature(input_example.numpy(), outputs.detach().cpu().numpy())
             # model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet", signature=signature)
-            mlflow.log_params(parameters)
             # Log classwise metrics
 
             mlflow.log_metric("val_loss", val_loss, step=epoch)
@@ -128,14 +125,8 @@ def objective(trial):
             print(f"Time: {ed-st:.2f}s")
             schedule.step()
 
-            trial.report(val_loss, epoch)
-
-            if trial.should_prune():
-                mlflow.log_param("pruned", True)
-                raise optuna.exceptions.TrialPruned()
-            
-
-        model_path = f"models/trial_{trial.number}.pth"
+        model_path = Path(f"models/{experiment_name}/{epoch}.pth")
+        model_path.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), model_path)
         mlflow.log_param("model_path", model_path)
         # mlflow.pytorch.log_model(model, artifact_path="model")
@@ -143,13 +134,4 @@ def objective(trial):
 
 if __name__ == "__main__":
 
-    study = optuna.create_study(direction='minimize',
-                                pruner=optuna.pruners.MedianPruner(n_warmup_steps=1))  # or 'maximize' if using accuracy directly
-    study.optimize(objective, n_trials=20)
-
-    print("Best Trial:")
-    trial = study.best_trial
-    print(f"  Value: {trial.value:.4f}")
-    print("  Params:")
-    for key, value in trial.params.items():
-        print(f"    {key}: {value}")
+    objective()

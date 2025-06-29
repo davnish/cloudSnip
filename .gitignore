@@ -19,7 +19,9 @@ mlflow.db
 
 # data
 /data
+/data_2
 
 # model
 /model
+/models
 panopticon_unet.pth

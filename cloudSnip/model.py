@@ -3,11 +3,11 @@ import torch.nn.functional as F
 from torchgeo.models import panopticon_vitb14, Panopticon_Weights
 from typing import Optional
 import torch
-from typing import Optional, Union, List, Tuple
+from typing import Union, List, Tuple
 # from torchgeo.models import Panopticon
 
 class DoubleConv(nn.Module):
-    def __init__(self, in_ch, out_ch, dprob=0.2):
+    def __init__(self, in_ch, out_ch, dprob=0.3):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
@@ -23,9 +23,9 @@ class DoubleConv(nn.Module):
         return self.conv(x)
 
 class DecoderBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, dprob=0.2):
+    def __init__(self, in_ch, out_ch, dprob=0.3, scale_factor=2):
         super().__init__()
-        self.up = nn.ConvTranspose2d(in_ch, in_ch, kernel_size=2, stride=2)
+        self.up = nn.ConvTranspose2d(in_ch, in_ch, kernel_size=scale_factor, stride=scale_factor)
         self.conv = DoubleConv(in_ch, out_ch, dprob)
 
     def forward(self, x):
