@@ -12,10 +12,13 @@ import tqdm
 from sklearn.metrics import f1_score, accuracy_score
 from sklearn.metrics import precision_score, recall_score
 import optuna
+from loss import CloudShadowLoss
+from pathlib import Path
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 mlflow.login()
 
-experiment_name = "cloudSnip_transforms"
+experiment_name = "hyperparameter"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 
@@ -25,7 +28,9 @@ def objective(trial):
     weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-2, log=True)
     epochs = trial.suggest_int('epochs', 50, 200)
     batch_size = trial.suggest_int('batch_size', 32, 64)
-    length = trial.suggest_int('length', 1000, 5000)
+    # length = trial.suggest_int('length', 1000, 5000)
+    length = 500
+    step_size = trial.suggest_int('step_size', 10, 50)
 
     parameters = dict(
         lr = lr,
@@ -33,30 +38,41 @@ def objective(trial):
         epochs = epochs,
         batch_size = batch_size,
         length = length,
+        step_size = step_size,
+        val_length = 100,
+        dropout = 0.3
     )
 
     train_sampler = NoDataAware_RandomSampler(train_dataset, size=224, length=parameters['length'], nodata_value=0, max_nodata_ratio=0.4)
-    train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4, drop_last=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, drop_last=True)
 
-    val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
-    val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4, drop_last=True)
+    # val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
+    val_sampler = NoDataAware_RandomSampler(val_dataset, size=224, length=parameters['val_length'], nodata_value=0, max_nodata_ratio=0.4)
+    val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, drop_last=True)
 
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    model = PanopticonUNet(num_classes=3).to(device)
+    model = PanopticonUNet(num_classes=3, dropout=parameters['dropout']).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
-    schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    criterion = nn.CrossEntropyLoss()
+    # schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    scheduler = ReduceLROnPlateau(
+                                optimizer,
+                                mode='min',         # or 'max' if you're tracking accuracy/Dice
+                                factor=0.5,         # reduce LR by half
+                                patience=5,         # wait 5 epochs before reducing
+                                threshold=1e-4,     # significant change threshold
+                                   # logs each LR update
+                            )
+    criterion = CloudShadowLoss()
 
 
 
     with mlflow.start_run(nested=True) as run:
-
+        for k, v in parameters.items():
+            mlflow.log_param(k, v)
 
         for epoch in range(epochs):
-            mlflow.log_param(parameters)
-            mlflow.log_param("lr", optimizer.param_groups[0]['lr'])
-            
+                    
             st = time.time()
             model.train()
             train_loss = 0.0
@@ -90,9 +106,10 @@ def objective(trial):
                     list_masks.append(masks.detach().cpu())
 
                     val_loss += loss.detach().cpu().item()
+            
             val_loss /= len(val_dataloader)
             ed = time.time()
-
+            scheduler.step(val_loss) 
             # Concatenate all outputs and masks
             all_outputs = torch.cat(list_outputs)
             all_masks = torch.cat(list_masks)
@@ -129,7 +146,6 @@ def objective(trial):
             print(f"Epoch [{epoch+1}/{parameters['epochs']}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, F1 Score: {f1:.4f}")
             print(f"Precision: {precision}, Recall: {recall}, Accuracy: {accuracy:.4f}")
             print(f"Time: {ed-st:.2f}s")
-            schedule.step()
 
             trial.report(val_loss, epoch)
 
@@ -138,9 +154,10 @@ def objective(trial):
                 raise optuna.exceptions.TrialPruned()
             
 
-        model_path = f"models/{experiment_name}/trial_{trial.number}.pth"
+        model_path = Path(f"models/{experiment_name}/trial_{trial.number}.pth")
+        model_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), model_path)
-        mlflow.log_param("model_path", model_path)
+        mlflow.log_param("model_path", model_path.as_posix())
         # mlflow.pytorch.log_model(model, artifact_path="model")
     return val_loss
 

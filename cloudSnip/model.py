@@ -33,14 +33,14 @@ class DecoderBlock(nn.Module):
         return self.conv(x)
 
 class UNetDecoder(nn.Module):
-    def __init__(self, in_ch):
+    def __init__(self, in_ch, dropout=0.3):
         super().__init__()
-        self.dec1 = DecoderBlock(in_ch, 256)
+        self.dec1 = DecoderBlock(in_ch, 256, dprob=dropout)
 
         self.bridge = nn.Conv2d(256, 256, 3, padding=1)
 
-        self.dec2 = DecoderBlock(256, 128)
-        self.dec3 = DecoderBlock(128, 64)
+        self.dec2 = DecoderBlock(256, 128, dprob=dropout)
+        self.dec3 = DecoderBlock(128, 64, dprob=dropout)
 
 
     def forward(self, x):
@@ -49,32 +49,32 @@ class UNetDecoder(nn.Module):
         x = F.interpolate(x, size=(56,56), mode='bilinear', align_corners=False) # 64x64 → 56x56
         x = self.bridge(x)  # DoubleConv to process the features
 
-        x = self.dec2(x)  # 56x56 → 112x112
+        x = self.dec2(x) #56x56 -> 112x112
 
-        x = self.dec3(x)  # 112x112 → 224x224
+        x = self.dec3(x) # 112x112 -> 224x224
         return x
     
 class PanopticonUNet(nn.Module):
-    def __init__(self,num_classes=3):
+    def __init__(self,num_classes=3, dropout=0.3):
         super().__init__()
         encoder = panopticon_vitb14(weights=Panopticon_Weights.VIT_BASE14, img_size=224)
 
-        # for param in encoder.parameters():
+        for param in encoder.parameters():
 
-        #     param.requires_grad = False
+            param.requires_grad = False
         
-        for name, param in encoder.named_parameters():
-            if ".bias" in name:
-                continue  # Biases are not frozen
-            else:
-                param.requires_grad = False
+        # for name, param in encoder.named_parameters():
+        #     if ".bias" in name:
+        #         continue  # Biases are not frozen
+        #     else:
+        #         param.requires_grad = False
             
 
         self.encoder = encoder.model
 
         self.neck = DoubleConv(768, 512)
 
-        self.decoder = UNetDecoder(512)
+        self.decoder = UNetDecoder(512, dropout=dropout)
 
         self.head = nn.Conv2d(64, num_classes, 3, padding=1)
 
@@ -84,7 +84,6 @@ class PanopticonUNet(nn.Module):
 
 
         x = self.encoder_intermediates(x, norm=True)
-
 
         x = torch.cat(x, dim=1)
 

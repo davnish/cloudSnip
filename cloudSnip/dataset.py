@@ -8,88 +8,35 @@ import random
 import torchvision.transforms.functional as F
 from torchvision.transforms import v2
 import torch.nn as nn
-
-class RandomHorizontalFlip(nn.Module):
-    def __init__(self, p=0.5):
-        super().__init__()
-        self.p = p
-
-    def forward(self, sample):
-        if random.random() < self.p:
-            if 'image' in sample:
-                sample['image'] = F.hflip(sample['image'])
-            if 'mask' in sample:
-                sample['mask'] = F.hflip(sample['mask'])
-        return sample
-
-class RandomVerticalFlip(nn.Module):
-    """Randomly flips the image and mask vertically with a given probability.
-    Args:
-        p (float): Probability of flipping the image and mask. Default is 0.5
-    """
-    def __init__(self, p=0.5):
-        super().__init__()
-        self.p = p
-
-    def forward(self, sample):
-        if random.random() < self.p:
-            if 'image' in sample:
-                sample['image'] = F.vflip(sample['image'])
-            if 'mask' in sample:
-                sample['mask'] = F.vflip(sample['mask'])
-        return sample
-
-class RandomRotation(nn.Module):
-    """Randomly rotates image and mask by an angle within (-degrees, +degrees)."""
-    def __init__(self, degrees):
-        super().__init__()
-        self.degrees = degrees if isinstance(degrees, tuple) else (-degrees, degrees)
-
-    def forward(self, sample):
-        angle = random.uniform(*self.degrees)
-        
-        if 'image' in sample:
-            sample['image'] = F.rotate(
-                sample['image'],
-                angle,
-                interpolation=F.InterpolationMode.BILINEAR,
-                expand=False,
-                fill=0
-            )
-        if 'mask' in sample:
-            sample['mask'] = F.rotate(
-                sample['mask'].unsqueeze(0),  # Ensure mask is 4D
-                angle,
-                interpolation=F.InterpolationMode.NEAREST,  # Important!
-                expand=False,
-                fill=0
-            ).squeeze(0)  # Remove the added dimension
-        return sample
+from torchgeo.transforms import AppendNDWI, AppendGRNDVI, AppendNDVI, AppendGNDVI
+from transforms import RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
 
 
 train_transforms = Compose([
     v2.ToImage(),
     v2.ToDtype(torch.float32, scale=True),
 
-    RandomHorizontalFlip(p=0.3),  # less frequent flipping
-    RandomVerticalFlip(p=0.3),  # optional: very rare in natural scenes
-    RandomRotation(degrees=30),  # subtle rotation if needed
+    RandomHorizontalFlip(p=0.3), 
+    RandomVerticalFlip(p=0.3), 
+    RandomRotation(degrees=30),  
 
-    v2.RandomAdjustSharpness(sharpness_factor=1.2, p=0.1), 
-    v2.RandomAutocontrast(p=0.1),  # reduced chance
+    v2.RandomAdjustSharpness(sharpness_factor=2, p=0.2), 
+    v2.RandomAutocontrast(p=0.2),  
     v2.ColorJitter(
-        brightness=0.1,  # small tweaks
-        contrast=0.1,
-        saturation=0.1,
-        hue=0.05
+        brightness=0.4,  
+        contrast=0.4,
+        saturation=0.4,
+        hue=0.2
     ),
     v2.RandomApply(
-        [v2.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5))],
-        p=0.1  # less frequent and gentler blur
+        [v2.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))],
+        p=0.2 
     ),
-  
+    
     v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
                  std=[0.16295877, 0.17293826, 0.15380774]),
+    # AppendNDWI(index_nir=0, index_green=2),
+    # AppendNDVI(index_nir=0, index_red=1),
 ])
 
 val_transforms = Compose([

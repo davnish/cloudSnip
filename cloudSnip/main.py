@@ -14,29 +14,26 @@ from sklearn.metrics import precision_score, recall_score
 import optuna
 from loss import CloudShadowLoss
 from pathlib import Path
+import yaml
 
 mlflow.login()
 
 experiment_name = "w_bitfit"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
+def read_yaml_to_dict(yaml_path):
+    with open(yaml_path, "r") as f:
+        data = yaml.safe_load(f)
+    return data
+
+parameters = read_yaml_to_dict("cloudSnip/config.yml")['parameters']
 
 def objective():
-    # Define the hyperparameters to optimize
-    parameters = dict(
-        lr = 8e-3,
-        weight_decay = 5e-4,
-        epochs = 200,
-        batch_size = 32,
-        length = 3000,
-        step_size = 10,
-        val_length = 600,
-    )
 
     train_sampler = NoDataAware_RandomSampler(train_dataset, size=224, length=parameters['length'], nodata_value=0, max_nodata_ratio=0.4)
-    train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, num_workers=4, drop_last=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, drop_last=True)
     val_sampler = NoDataAware_RandomSampler(val_dataset, size=224, length=parameters['val_length'], nodata_value=0, max_nodata_ratio=0.4)
-    val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, num_workers=4, drop_last=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, drop_last=True)
 
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     model = PanopticonUNet(num_classes=3).to(device)

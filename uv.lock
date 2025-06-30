@@ -322,6 +322,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "geopandas" },
     { name = "ipykernel" },
+    { name = "lightning" },
     { name = "matplotlib" },
     { name = "mlflow" },
     { name = "optuna" },
@@ -335,6 +336,7 @@ dependencies = [
 requires-dist = [
     { name = "geopandas", specifier = ">=1.1.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "lightning", specifier = ">=2.5.2" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "mlflow", specifier = ">=3.1.0" },
     { name = "optuna", specifier = ">=4.4.0" },
