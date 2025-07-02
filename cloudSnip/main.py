@@ -18,7 +18,7 @@ import yaml
 
 mlflow.login()
 
-experiment_name = "w_bitfit"
+experiment_name = "ww_bitfit"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 def read_yaml_to_dict(yaml_path):

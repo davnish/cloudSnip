@@ -16,21 +16,21 @@ from loss import CloudShadowLoss
 from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-mlflow.login()
 
-experiment_name = "hyperparameter"
+experiment_name = "4scale_1view"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 
 def objective(trial):
     # Define the hyperparameters to optimize
-    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
+    lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-2, log=True)
     epochs = trial.suggest_int('epochs', 50, 200)
-    batch_size = trial.suggest_int('batch_size', 32, 64)
+    batch_size = 32
     # length = trial.suggest_int('length', 1000, 5000)
-    length = 500
-    step_size = trial.suggest_int('step_size', 10, 50)
+    length = 2000
+    dropout = trial.suggest_float('dropout', 0.1, 0.5)
+    # step_size = trial.suggest_int('step_size', 10, 50)
 
     parameters = dict(
         lr = lr,
@@ -38,9 +38,9 @@ def objective(trial):
         epochs = epochs,
         batch_size = batch_size,
         length = length,
-        step_size = step_size,
-        val_length = 100,
-        dropout = 0.3
+        # step_size = step_size,
+        val_length = 400,
+        dropout = dropout
     )
 
     train_sampler = NoDataAware_RandomSampler(train_dataset, size=224, length=parameters['length'], nodata_value=0, max_nodata_ratio=0.4)
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     study = optuna.create_study(direction='minimize',
                                 pruner=optuna.pruners.MedianPruner(n_warmup_steps=1)
                                 )  # or 'maximize' if using accuracy directly
-    study.optimize(objective, n_trials=20)
+    study.optimize(objective, n_trials=50)
 
     print("Best Trial:")
     trial = study.best_trial

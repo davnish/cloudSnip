@@ -325,10 +325,12 @@ dependencies = [
     { name = "lightning" },
     { name = "matplotlib" },
     { name = "mlflow" },
+    { name = "numpy" },
     { name = "optuna" },
     { name = "rasterio" },
     { name = "ruff" },
     { name = "torchgeo" },
+    { name = "torchmetrics" },
     { name = "tqdm" },
 ]
 
@@ -339,10 +341,12 @@ requires-dist = [
     { name = "lightning", specifier = ">=2.5.2" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "mlflow", specifier = ">=3.1.0" },
+    { name = "numpy", specifier = ">=2.3.1" },
     { name = "optuna", specifier = ">=4.4.0" },
     { name = "rasterio", specifier = ">=1.4.3" },
     { name = "ruff", specifier = ">=0.12.1" },
     { name = "torchgeo", specifier = ">=0.7.1" },
+    { name = "torchmetrics", specifier = ">=1.7.3" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
