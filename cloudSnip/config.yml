@@ -1,9 +1,9 @@
 parameters:
-  lr: 0.0008
-  weight_decay: 0.0005
-  epochs: 200
-  batch_size: 32
-  length: 2000
+  lr: 0.0001
+  weight_decay: 0.0001
+  epochs: 30
+  batch_size: 64
+  length: 1500
   step_size: 20
-  val_length: 400
-  dropout: 0.3
+  val_length: 300
+  dropout: 0.2

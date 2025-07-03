@@ -11,6 +11,8 @@ import torch.nn as nn
 from torchgeo.transforms import AppendNDWI, AppendGRNDVI, AppendNDVI, AppendGNDVI
 from transforms import RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
 
+# from rasvec import patchify_raster
+
 
 train_transforms = Compose([
     v2.ToImage(),
@@ -107,6 +109,7 @@ class Liss4_GT(RasterDataset):
         mask = sample["mask"]
         mask = torch.nan_to_num(mask, nan=0.0)
         mask = torch.where(mask < 0, torch.tensor(0, dtype=torch.int64), mask)
+        mask = torch.where(mask > 2, torch.tensor(0, dtype=torch.int64), mask)
         sample["mask"] = mask
         return sample
 

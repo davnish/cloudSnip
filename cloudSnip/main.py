@@ -18,7 +18,7 @@ import yaml
 
 mlflow.login()
 
-experiment_name = "ww_bitfit"
+experiment_name = "v7"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 def read_yaml_to_dict(yaml_path):
@@ -121,11 +121,12 @@ def objective():
             print(f"Precision: {precision}, Recall: {recall}, Accuracy: {accuracy:.4f}")
             print(f"Time: {ed-st:.2f}s")
             schedule.step()
-
-        model_path = Path(f"models/{experiment_name}/{epoch}.pth")
-        model_path.mkdir(parents=True, exist_ok=True)
-        torch.save(model.state_dict(), model_path)
-        mlflow.log_param("model_path", model_path)
+            
+            model_dir = Path(f"models/{experiment_name}")
+            model_dir.mkdir(parents=True, exist_ok=True)
+            model_path = model_dir / f"{epoch}.pth"
+            torch.save(model.state_dict(), model_path)
+            # mlflow.log_param("model_path", model_path)
         # mlflow.pytorch.log_model(model, artifact_path="model")
     return val_loss
 

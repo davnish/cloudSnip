@@ -15,21 +15,24 @@ import optuna
 from loss import CloudShadowLoss
 from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
-
-experiment_name = "4scale_1view"
+experiment_name = "v2_more"
+mlflow.login()
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
-
+# N_BATCH = 20
 def objective(trial):
     # Define the hyperparameters to optimize
-    lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-2, log=True)
-    epochs = trial.suggest_int('epochs', 50, 200)
-    batch_size = 32
+    lr = 1e-4
+    # lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
+    weight_decay = 5e-4
+    # weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-2, log=True)
+    epochs = 30
+    batch_size = 64
     # length = trial.suggest_int('length', 1000, 5000)
-    length = 2000
-    dropout = trial.suggest_float('dropout', 0.1, 0.5)
+    length = 1500
+    dropout = 0.2
     # step_size = trial.suggest_int('step_size', 10, 50)
 
     parameters = dict(
@@ -39,7 +42,7 @@ def objective(trial):
         batch_size = batch_size,
         length = length,
         # step_size = step_size,
-        val_length = 400,
+        val_length = 300,
         dropout = dropout
     )
 
@@ -50,19 +53,20 @@ def objective(trial):
     val_sampler = NoDataAware_RandomSampler(val_dataset, size=224, length=parameters['val_length'], nodata_value=0, max_nodata_ratio=0.4)
     val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, drop_last=True)
 
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = PanopticonUNet(num_classes=3, dropout=parameters['dropout']).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
     # schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    scheduler = ReduceLROnPlateau(
-                                optimizer,
-                                mode='min',         # or 'max' if you're tracking accuracy/Dice
-                                factor=0.5,         # reduce LR by half
-                                patience=5,         # wait 5 epochs before reducing
-                                threshold=1e-4,     # significant change threshold
-                                   # logs each LR update
-                            )
+    scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0.00001)
+    # scheduler = ReduceLROnPlateau(
+    #                             optimizer,
+    #                             mode='min',         # or 'max' if you're tracking accuracy/Dice
+    #                             factor=0.5,         # reduce LR by half
+    #                             patience=5,         # wait 5 epochs before reducing
+    #                             threshold=1e-4,     # significant change threshold
+    #                                # logs each LR update
+    #                         )
     criterion = CloudShadowLoss()
 
 
@@ -87,6 +91,7 @@ def objective(trial):
                 loss.backward()
                 optimizer.step()
                 train_loss += loss.detach().cpu().item()
+
             train_loss /= len(train_dataloader)
 
             # validation
@@ -109,7 +114,7 @@ def objective(trial):
             
             val_loss /= len(val_dataloader)
             ed = time.time()
-            scheduler.step(val_loss) 
+            scheduler.step() 
             # Concatenate all outputs and masks
             all_outputs = torch.cat(list_outputs)
             all_masks = torch.cat(list_masks)
@@ -153,8 +158,13 @@ def objective(trial):
                 mlflow.log_param("pruned", True)
                 raise optuna.exceptions.TrialPruned()
             
+           
+            model_path = Path(f"models/{experiment_name}/{epoch}.pth")
+            model_path.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), model_path)
+            
 
-        model_path = Path(f"models/{experiment_name}/trial_{trial.number}.pth")
+        model_path = Path(f"models/{experiment_name}/{epoch}.pth")
         model_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), model_path)
         mlflow.log_param("model_path", model_path.as_posix())

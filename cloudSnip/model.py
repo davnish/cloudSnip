@@ -35,8 +35,8 @@ class DecoderBlock(nn.Module):
 class UNetDecoder(nn.Module):
     def __init__(self, in_ch, dropout=0.3):
         super().__init__()
-        self.dec1 = DecoderBlock(in_ch, 256, dprob=dropout, scale_factor=4)  # 16x16 -> 64x64
-        self.dec2 = DecoderBlock(256, 128, dprob=dropout, scale_factor=4)  # 64x64 -> 128x128
+        self.dec1 = DecoderBlock(in_ch, 256, dprob=dropout, scale_factor=2)  # 16x16 -> 64x64
+        self.dec2 = DecoderBlock(256, 128, dprob=dropout, scale_factor=2)  # 64x64 -> 128x128
 
         self.bridge = nn.Conv2d(128, 128, 3, padding=1)
 
