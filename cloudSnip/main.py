@@ -15,10 +15,11 @@ import optuna
 from loss import CloudShadowLoss
 from pathlib import Path
 import yaml
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 mlflow.login()
 
-experiment_name = "v7"
+experiment_name = "v8"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 def read_yaml_to_dict(yaml_path):
@@ -39,7 +40,8 @@ def objective():
     model = PanopticonUNet(num_classes=3).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
-    schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=parameters['step_size'], gamma=0.5)
+    scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0.00001)
+
     criterion = CloudShadowLoss()
 
     with mlflow.start_run(nested=True) as run:
@@ -120,7 +122,7 @@ def objective():
             print(f"Epoch [{epoch+1}/{parameters['epochs']}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, F1 Score: {f1:.4f}")
             print(f"Precision: {precision}, Recall: {recall}, Accuracy: {accuracy:.4f}")
             print(f"Time: {ed-st:.2f}s")
-            schedule.step()
+            scheduler.step()
             
             model_dir = Path(f"models/{experiment_name}")
             model_dir.mkdir(parents=True, exist_ok=True)
