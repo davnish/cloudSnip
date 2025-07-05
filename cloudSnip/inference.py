@@ -5,7 +5,8 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.metrics import accuracy_score
 from dataset import train_dataset, val_dataset, NoDataAware_RandomSampler
 from torch.utils.data import DataLoader
-from model import PanopticonUNet
+# from model import PanopticonUNet
+from f2p_unet_model import PanopticonUNet
 from loss import CloudShadowLoss
 from torchgeo.samplers import GridGeoSampler
 from torchgeo.datasets import stack_samples
@@ -15,7 +16,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dataset import val_transforms
 
-
+experiment = "f2p_approach"
+run_id = "4181712d059f465991008c62ecb96d84"
+model_no = "25"
 def read_yaml_to_dict(yaml_path):
     with open(yaml_path, "r") as f:
         data = yaml.safe_load(f)
@@ -32,7 +35,7 @@ inference_dataloader = DataLoader(inference_dataset, batch_size=parameters['batc
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 model = PanopticonUNet(num_classes=3)
 model.to(device)
-model.load_state_dict(torch.load("models/model_skip_scale/10.pth", map_location=device), strict=True)
+model.load_state_dict(torch.load(f"models/{experiment}/{run_id}/{model_no}.pth", map_location=device), strict=True)
 # criterion = CloudShadowLoss()
 # list_outputs = []
 # list_masks = []
@@ -53,6 +56,6 @@ with torch.no_grad():
         ax[1].imshow(outputs[idx].argmax(dim=0).cpu().numpy())
         ax[1].set_title("Predicted Mask")
         plt.show()
-        plt.savefig("output.png")
+        plt.savefig(f"{experiment}.png")
         break
 ed = time.time()

@@ -8,7 +8,7 @@ import random
 import torchvision.transforms.functional as F
 from torchvision.transforms import v2
 import torch.nn as nn
-from torchgeo.transforms import AppendNDWI, AppendGRNDVI, AppendNDVI, AppendGNDVI
+from transforms import AppendNDWI, AppendNDVI
 from transforms import RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
 
 # from rasvec import patchify_raster
@@ -35,17 +35,22 @@ train_transforms = Compose([
         p=0.2 
     ),
     
-    v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
-                 std=[0.16295877, 0.17293826, 0.15380774]),
-    # AppendNDWI(index_nir=0, index_green=2),
+    
+    # AppendNDWI(),
+    # AppendNDVI(),
+    # v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132,0.0,0.0],
+    #              std=[0.16295877, 0.17293826, 0.15380774, 1.0,1.0]),
+
     # AppendNDVI(index_nir=0, index_red=1),
 ])
 
 val_transforms = Compose([
     v2.ToImage(),
     v2.ToDtype(torch.float32, scale=True),
-    v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
-                 std=[0.16295877, 0.17293826, 0.15380774]),
+    # AppendNDWI(),
+    # AppendNDVI(),
+    # v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132, 0.0, 0.0],
+    #              std=[0.16295877, 0.17293826, 0.15380774, 1.0, 1.0]),
 ])
 
 class NoDataAware_RandomSampler(RandomGeoSampler):

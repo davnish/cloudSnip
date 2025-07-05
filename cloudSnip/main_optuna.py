@@ -58,7 +58,7 @@ def objective(trial):
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
     # schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0.00001)
+    scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0.0001)
     # scheduler = ReduceLROnPlateau(
     #                             optimizer,
     #                             mode='min',         # or 'max' if you're tracking accuracy/Dice

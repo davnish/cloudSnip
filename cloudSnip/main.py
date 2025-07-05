@@ -1,11 +1,12 @@
 # import mlflow.pytorch
 import torch
 import torch.nn as nn
-from model import PanopticonUNet
+# from model import PanopticonUNet
+from f2p_unet_model import PanopticonUNet
 from dataset import train_dataset, val_dataset, NoDataAware_RandomSampler
 from torch.utils.data import DataLoader
 import time
-from torchgeo.samplers import GridGeoSampler
+from torchgeo.samplers import GridGeoSampler, RandomGeoSampler
 from torchgeo.datasets import stack_samples
 import mlflow
 import tqdm
@@ -16,10 +17,11 @@ from loss import CloudShadowLoss
 from pathlib import Path
 import yaml
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.nn import CrossEntropyLoss
 
 mlflow.login()
 
-experiment_name = "v8"
+experiment_name = "transform_augmentation"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 def read_yaml_to_dict(yaml_path):
@@ -31,18 +33,22 @@ parameters = read_yaml_to_dict("cloudSnip/config.yml")['parameters']
 
 def objective():
 
-    train_sampler = NoDataAware_RandomSampler(train_dataset, size=224, length=parameters['length'], nodata_value=0, max_nodata_ratio=0.4)
+    # train_sampler = Rand(train_dataset, size=224, length=parameters['length'], nodata_value=0, max_nodata_ratio=0.4)
+    train_sampler = RandomGeoSampler(train_dataset, length=parameters['length'], size=224)
     train_dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], sampler=train_sampler, collate_fn=stack_samples, drop_last=True)
-    val_sampler = NoDataAware_RandomSampler(val_dataset, size=224, length=parameters['val_length'], nodata_value=0, max_nodata_ratio=0.4)
+    val_sampler = GridGeoSampler(val_dataset, size=224, stride=210)
     val_dataloader = DataLoader(val_dataset, batch_size=parameters['batch_size'], sampler=val_sampler, collate_fn=stack_samples, drop_last=True)
 
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = PanopticonUNet(num_classes=3).to(device)
+    model.load_state_dict(torch.load("models/transform_augmentation/5dded9e090db4614830145f260aa5376/30.pth", map_location=device))
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
-    scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0.00001)
-
+    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0.00005)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=5, min_lr=0.00005)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
     criterion = CloudShadowLoss()
+    # criterion = CrossEntropyLoss()
 
     with mlflow.start_run(nested=True) as run:
         for k, v in parameters.items():
@@ -123,11 +129,22 @@ def objective():
             print(f"Precision: {precision}, Recall: {recall}, Accuracy: {accuracy:.4f}")
             print(f"Time: {ed-st:.2f}s")
             scheduler.step()
-            
-            model_dir = Path(f"models/{experiment_name}")
-            model_dir.mkdir(parents=True, exist_ok=True)
-            model_path = model_dir / f"{epoch}.pth"
-            torch.save(model.state_dict(), model_path)
+
+            # new_weight_decay = parameters['weight_decay'] * (parameters['decay_rate'] ** epoch)
+            # optimizer.param_groups[0]['weight_decay'] = new_weight_decay
+            lr = optimizer.param_groups[0]['lr']
+
+            print(f"Current: Learning rate = {lr:.6f}")
+            if epoch % 10 == 0:
+                # Save model checkpoint
+                # mlflow.pytorch.log_mosdel(model, artifact_path=f"model_epoch_{epoch}")
+                print(f"Saving model at epoch {epoch}...")
+                # Save the model state_dict
+                model_dir = Path(f"models/{experiment_name}/{run.info.run_id}")
+                model_dir.mkdir(parents=True, exist_ok=True)
+                model_path = model_dir / f"{epoch}.pth"
+                torch.save(model.state_dict(), model_path)
+
             # mlflow.log_param("model_path", model_path)
         # mlflow.pytorch.log_model(model, artifact_path="model")
     return val_loss

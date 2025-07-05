@@ -14,11 +14,13 @@ class DoubleConv(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.GELU(),
             nn.Dropout2d(dprob),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.GELU(),
             nn.Dropout2d(dprob)
         )
     def forward(self, x):
@@ -106,8 +108,8 @@ class UNetDecoder(nn.Module):
 
         prev_channels = in_channels
         for out_channels in layer_dimensions:
-            self.upsamples.append(nn.ConvTranspose2d(prev_channels, prev_channels, kernel_size=2, stride=2))
-            self.convs.append(DoubleConv(prev_channels+in_channels, out_channels))
+            self.upsamples.append(nn.ConvTranspose2d(prev_channels, out_channels, kernel_size=2, stride=2))
+            self.convs.append(DoubleConv(out_channels+in_channels, out_channels))
             prev_channels = out_channels
 
     def forward(self, x: torch.Tensor, skip_features: List[torch.Tensor]) -> torch.Tensor:
@@ -136,6 +138,12 @@ class PanopticonUNet(nn.Module):
 
         for param in encoder.parameters():
             param.requires_grad = False
+
+        # for name, param in encoder.named_parameters():
+        #     if ".bias" in name:
+        #         continue  # Biases are not frozen
+        #     else:
+        #         param.requires_grad = False
 
             
         self.num_classes = num_classes

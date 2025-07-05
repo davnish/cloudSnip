@@ -4,7 +4,44 @@ import torch.nn as nn
 import torchvision.transforms.functional as F
 from torchvision.transforms import v2
 
+class AppendNDWI(nn.Module):
+    def __init__(self):
+        super().__init__()
 
+    def forward(self, sample):
+        if 'image' in sample:
+            band_green = sample['image'][2]
+            band_nir = sample['image'][0]
+            ndwi = (band_green - band_nir) / (band_green + band_nir + 1e-8)
+            ndwi = ndwi.unsqueeze(0)  # Add channel dimension
+            sample['image'] = torch.cat((sample['image'], ndwi), dim=0)
+        return sample
+class AppendNDWI(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, sample):
+        if 'image' in sample:
+            band_green = sample['image'][2]
+            band_nir = sample['image'][0]
+            ndwi = (band_green - band_nir) / (band_green + band_nir + 1e-8)
+            ndwi = ndwi.unsqueeze(0)  # Add channel dimension
+            sample['image'] = torch.cat((sample['image'], ndwi), dim=0)
+        return sample
+    
+class AppendNDVI(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, sample):
+        if 'image' in sample:
+            band_red = sample['image'][2]
+            band_nir = sample['image'][1]
+            ndvi = (band_red - band_nir) / (band_red + band_nir + 1e-8)
+            ndvi = ndvi.unsqueeze(0)  # Add channel dimension
+            sample['image'] = torch.cat((sample['image'], ndvi), dim=0)
+        return sample
+    
 class RandomHorizontalFlip(nn.Module):
     def __init__(self, p=0.5):
         super().__init__()
