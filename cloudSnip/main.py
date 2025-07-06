@@ -1,8 +1,7 @@
 # import mlflow.pytorch
 import torch
 import torch.nn as nn
-# from model import PanopticonUNet
-from f2p_unet_model import PanopticonUNet
+from model import PanopticonUNet
 from dataset import train_dataset, val_dataset, NoDataAware_RandomSampler
 from torch.utils.data import DataLoader
 import time
@@ -21,7 +20,7 @@ from torch.nn import CrossEntropyLoss
 
 mlflow.login()
 
-experiment_name = "increasing_alpha"
+experiment_name = "increasing_data"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 def read_yaml_to_dict(yaml_path):

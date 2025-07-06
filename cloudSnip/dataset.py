@@ -17,8 +17,6 @@ from transforms import RandomHorizontalFlip, RandomVerticalFlip, RandomRotation,
 train_transforms = Compose([
     v2.ToImage(),
     v2.ToDtype(torch.float32, scale=True),
-
-
     RandomHorizontalFlip(p=0.3), 
     RandomVerticalFlip(p=0.3), 
     RandomRotation(degrees=30),  
@@ -28,18 +26,14 @@ train_transforms = Compose([
         brightness=0.4,  
         contrast=0.4,
         saturation=0.4,
-
         hue=0.2
     ),
     v2.RandomApply(
         [v2.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))],
         p=0.2 
     ),
-    
     v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
                  std=[0.16295877, 0.17293826, 0.15380774]),
-
-
 ])
 
 val_transforms = Compose([
@@ -62,7 +56,6 @@ class NoDataAware_RandomSampler(RandomGeoSampler):
         while generated < self.length:
             # Get a random query from parent sampler
             query = next(super().__iter__())
-            
             try:
                 # Check the sample for nodata
                 sample = self.dataset[query]
@@ -72,7 +65,6 @@ class NoDataAware_RandomSampler(RandomGeoSampler):
                     # Skip if too much nodata
                     if nodata_ratio >= self.max_nodata_ratio:
                         continue
-                
                 yield query
                 generated += 1
             except Exception as e:

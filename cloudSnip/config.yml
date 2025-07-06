@@ -3,8 +3,8 @@ parameters:
   weight_decay: 0.001
   epochs: 80
   batch_size: 32
-  length: 3000
+  length: 4000
   step_size: 20
-  val_length: 500
+  val_length: 800
   decay_rate: 0.95
   dropout: 0.2

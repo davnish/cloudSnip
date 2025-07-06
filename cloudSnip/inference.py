@@ -36,9 +36,6 @@ device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 model = PanopticonUNet(num_classes=3)
 model.to(device)
 model.load_state_dict(torch.load(f"models/{experiment}/{run_id}/{model_no}.pth", map_location=device), strict=True)
-# criterion = CloudShadowLoss()
-# list_outputs = []
-# list_masks = []
 
 with torch.no_grad():
     model.eval()

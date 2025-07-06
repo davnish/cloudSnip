@@ -31,7 +31,7 @@ class FocalLoss(nn.Module):
         return ((1 - p) ** self.gamma * logp).mean()
 
 class CloudShadowLoss(nn.Module):
-    def __init__(self, alpha=0.7):
+    def __init__(self, alpha=0.6):
         super().__init__()
         self.dice = DiceLoss()
         self.focal = FocalLoss()
