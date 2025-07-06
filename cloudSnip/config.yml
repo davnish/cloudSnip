@@ -1,9 +1,9 @@
 parameters:
-  lr: 0.0005
+  lr: 0.0002
   weight_decay: 0.001
   epochs: 80
   batch_size: 32
-  length: 2000
+  length: 3000
   step_size: 20
   val_length: 500
   decay_rate: 0.95

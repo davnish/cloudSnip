@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dataset import val_transforms
 
-experiment = "f2p_approach"
-run_id = "4181712d059f465991008c62ecb96d84"
-model_no = "25"
+experiment = "increasing_alpha"
+run_id = "afbbd4b9d73041e28b69eca999850be0"
+model_no = "20"
 def read_yaml_to_dict(yaml_path):
     with open(yaml_path, "r") as f:
         data = yaml.safe_load(f)
@@ -49,7 +49,7 @@ with torch.no_grad():
 
         # plt.imshow
         # print(outputs[0].cpu().numpy().transpose(1, 2, 0))
-        idx = 6
+        idx = 21
         fix, ax = plt.subplots(1, 2, figsize=(10, 5))
         ax[0].imshow(batch['imgs'][idx].cpu().numpy().transpose(1, 2, 0))
         ax[0].set_title("Input Image")

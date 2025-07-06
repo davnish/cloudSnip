@@ -21,7 +21,7 @@ from torch.nn import CrossEntropyLoss
 
 mlflow.login()
 
-experiment_name = "transform_augmentation"
+experiment_name = "increasing_alpha"
 mlflow.set_experiment(f"/Users/nischal.singh38@gmail.com/{experiment_name}")
 
 def read_yaml_to_dict(yaml_path):
@@ -41,11 +41,11 @@ def objective():
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = PanopticonUNet(num_classes=3).to(device)
-    model.load_state_dict(torch.load("models/transform_augmentation/5dded9e090db4614830145f260aa5376/30.pth", map_location=device))
+    # model.load_state_dict(torch.load("models/transform_augmentation/5dded9e090db4614830145f260aa5376/30.pth", map_location=device))
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
-    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0.00005)
-    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=5, min_lr=0.00005)
+    # scheduler = CosineAnnealingLR(optimizer, T_max=30, eta_min=0.00005)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=5, min_lr=0.00008)
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
     criterion = CloudShadowLoss()
     # criterion = CrossEntropyLoss()
@@ -128,21 +128,21 @@ def objective():
             print(f"Epoch [{epoch+1}/{parameters['epochs']}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, F1 Score: {f1:.4f}")
             print(f"Precision: {precision}, Recall: {recall}, Accuracy: {accuracy:.4f}")
             print(f"Time: {ed-st:.2f}s")
-            scheduler.step()
+            scheduler.step(val_loss)
 
             # new_weight_decay = parameters['weight_decay'] * (parameters['decay_rate'] ** epoch)
             # optimizer.param_groups[0]['weight_decay'] = new_weight_decay
             lr = optimizer.param_groups[0]['lr']
 
             print(f"Current: Learning rate = {lr:.6f}")
-            if epoch % 10 == 0:
+            if (epoch+1) % 10 == 0:
                 # Save model checkpoint
                 # mlflow.pytorch.log_mosdel(model, artifact_path=f"model_epoch_{epoch}")
-                print(f"Saving model at epoch {epoch}...")
+                print(f"Saving model at epoch {epoch+1}...")
                 # Save the model state_dict
                 model_dir = Path(f"models/{experiment_name}/{run.info.run_id}")
                 model_dir.mkdir(parents=True, exist_ok=True)
-                model_path = model_dir / f"{epoch}.pth"
+                model_path = model_dir / f"{epoch+1}.pth"
                 torch.save(model.state_dict(), model_path)
 
             # mlflow.log_param("model_path", model_path)

@@ -16,6 +16,15 @@ class AppendNDWI(nn.Module):
             ndwi = ndwi.unsqueeze(0)  # Add channel dimension
             sample['image'] = torch.cat((sample['image'], ndwi), dim=0)
         return sample
+    
+class PerImageMinMaxNormalize:
+    def __call__(self, sample):
+        min_val = sample['image'].min()
+        max_val = sample['image'].max()
+        sample['image'] = (sample['image'] - min_val) / (max_val - min_val + 1e-8)  # avoid division by zero
+        return sample
+
+
 class AppendNDWI(nn.Module):
     def __init__(self):
         super().__init__()

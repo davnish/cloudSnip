@@ -9,7 +9,7 @@ import torchvision.transforms.functional as F
 from torchvision.transforms import v2
 import torch.nn as nn
 from transforms import AppendNDWI, AppendNDVI
-from transforms import RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
+from transforms import RandomHorizontalFlip, RandomVerticalFlip, RandomRotation, PerImageMinMaxNormalize
 
 # from rasvec import patchify_raster
 
@@ -18,16 +18,17 @@ train_transforms = Compose([
     v2.ToImage(),
     v2.ToDtype(torch.float32, scale=True),
 
+
     RandomHorizontalFlip(p=0.3), 
     RandomVerticalFlip(p=0.3), 
     RandomRotation(degrees=30),  
-
     v2.RandomAdjustSharpness(sharpness_factor=2, p=0.2), 
     v2.RandomAutocontrast(p=0.2),  
     v2.ColorJitter(
         brightness=0.4,  
         contrast=0.4,
         saturation=0.4,
+
         hue=0.2
     ),
     v2.RandomApply(
@@ -35,22 +36,18 @@ train_transforms = Compose([
         p=0.2 
     ),
     
-    
-    # AppendNDWI(),
-    # AppendNDVI(),
-    # v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132,0.0,0.0],
-    #              std=[0.16295877, 0.17293826, 0.15380774, 1.0,1.0]),
+    v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
+                 std=[0.16295877, 0.17293826, 0.15380774]),
 
-    # AppendNDVI(index_nir=0, index_red=1),
+
 ])
 
 val_transforms = Compose([
     v2.ToImage(),
     v2.ToDtype(torch.float32, scale=True),
-    # AppendNDWI(),
-    # AppendNDVI(),
-    # v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132, 0.0, 0.0],
-    #              std=[0.16295877, 0.17293826, 0.15380774, 1.0, 1.0]),
+    v2.Normalize(mean=[0.36576813, 0.3658635, 0.3988132],
+                 std=[0.16295877, 0.17293826, 0.15380774]),
+    
 ])
 
 class NoDataAware_RandomSampler(RandomGeoSampler):

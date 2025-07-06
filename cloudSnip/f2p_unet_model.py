@@ -9,7 +9,7 @@ from typing import Optional, Union, List, Tuple
 # from torchgeo.models import Panopticon
 
 class DoubleConv(nn.Module):
-    def __init__(self, in_ch, out_ch, dprob=0.2):
+    def __init__(self, in_ch, out_ch, dprob=0.):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
@@ -55,11 +55,16 @@ class Feature2Pyramid(nn.Module):
                     nn.GELU(),
                     nn.ConvTranspose2d(
                         embed_dim, embed_dim, kernel_size=2, stride=2),
+                    nn.BatchNorm2d(embed_dim),
+                    nn.GELU(),
                 )
             elif k == 2:
                 self.upsample_2x = nn.Sequential(
-                    nn.ConvTranspose2d(
-                        embed_dim, embed_dim, kernel_size=2, stride=2))
+                    nn.ConvTranspose2d(embed_dim, embed_dim, kernel_size=2, stride=2),
+                    nn.BatchNorm2d(embed_dim),
+                    nn.GELU(),
+                    )
+                
             elif k == 1:
                 self.identity = nn.Identity()
             elif k == 0.5:
@@ -139,12 +144,6 @@ class PanopticonUNet(nn.Module):
         for param in encoder.parameters():
             param.requires_grad = False
 
-        # for name, param in encoder.named_parameters():
-        #     if ".bias" in name:
-        #         continue  # Biases are not frozen
-        #     else:
-        #         param.requires_grad = False
-
             
         self.num_classes = num_classes
 
@@ -180,7 +179,7 @@ class PanopticonUNet(nn.Module):
     def encoder_intermediates(
             self,
             x: torch.Tensor,
-            indices: Optional[Union[int, List[int]]] = [3, 5, 7, 11],
+            indices: Optional[Union[int, List[int]]] = [2, 5, 8, 11],
             norm: bool = True,
     ) -> Tuple[torch.Tensor, List[torch.Tensor]]:
         """ Forward features that returns intermediates.
