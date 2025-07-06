@@ -22,9 +22,10 @@ import torch.nn.functional as F
 from pathlib import Path
 import rasterio as rio
 from torchvision.transforms import v2, Compose
+import cv2 as cv
 
 
-model_path = "/home/nischal/projects/cloudSnip/models/increasing_data/548a21f452d84499a3c84f94a07a8137/best/1.pth"
+model_path = "models/increasing_data/016a24284b5945f2b201664bd5c3e98e/best/25.pth"
 
 def read_yaml_to_dict(yaml_path):
     with open(yaml_path, "r") as f:
@@ -105,23 +106,42 @@ def merge_patches(preds, positions, full_shape, patch_size=224, stride=160):
     output /= count.clamp(min=1e-8)
     return output  # shape: [C, H, W]
 
-def save_map(path, segmentation_map, profile):
+def postprocess_image(img_raw, segmentation_map, profile):
     clip_map = segmentation_map.numpy().astype(np.uint8)[:profile['height'], :profile['width']]
+    kernel = np.ones((5,5),np.uint8)
+    closing = cv.morphologyEx(clip_map, cv.MORPH_CLOSE, kernel)
+    nan_mask = np.isnan(img_raw).any(axis=0)
+    closing[nan_mask] = 0
+    return closing
+
+def save_map(path, segmentation_map, profile):
+
+    profile['count'] = 1  # Single channel output
+    profile['dtype'] = 'uint8'
     with rio.open(path, 'w', **profile) as dst:
-        dst.write(clip_map, 1)  # Assuming single channel output
+        dst.write(segmentation_map, 1)  # Assuming single channel output
 
 
 def get_segmentation_map(input_img, output_img):
-    image, profile = get_image_profile(input_img)
-    image = preprocess_image(image)  # shape: [C, H, W]
+    img_raw, profile = get_image_profile(input_img)
+    image = preprocess_image(img_raw)  # shape: [C, H, W]
     image = pad_to_fit(image, patch_size=224, stride=160)  # shape: [C, H, W]
     patches, positions = get_patches(image, patch_size=224, stride=160)
     preds = predict_on_patches(model, patches, device)
     output = merge_patches(preds, positions, image.shape[1:], patch_size=224, stride=160)
     segmentation_map = torch.argmax(output, dim=0)  # shape [H, W]
+    segmentation_map = postprocess_image(img_raw, segmentation_map, profile)  # shape: [C, H, W]
     save_map(output_img, segmentation_map, profile)
+    return segmentation_map
 
 if __name__ == "__main__":
     for input_imag in Path("data/unprocessed_data/val/img").glob("*.tif"):
         output_imag = Path("test_segmentation_map/") / input_imag.name
-        get_segmentation_map(input_imag, output_imag)
+        segmentation_map = get_segmentation_map(input_imag, output_imag)
+
+
+        # plt.imshow(segmentation_map, cmap='gray')
+        # plt.axis('off')
+        # plt.savefig(str(output_imag.with_suffix('.png')), bbox_inches='tight', pad_inches=0)
+        # plt.close()
+
