@@ -20,6 +20,7 @@ mlflow.db
 # data
 /data
 /data_2
+/test_segmentation_map
 
 # model
 /model

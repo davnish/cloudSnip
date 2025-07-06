@@ -168,16 +168,11 @@ class PanopticonUNet(nn.Module):
         Returns:
 
         """
-
         intermediates = []
-        # take_indices = indices
-
-        # forward pass
         x = self.encoder.patch_embed(x)
         x = self.encoder._pos_embed(x)
         x = self.encoder.patch_drop(x)
         x = self.encoder.norm_pre(x)
-
 
         for i, blk in enumerate(self.encoder.blocks):
             x = blk(x)

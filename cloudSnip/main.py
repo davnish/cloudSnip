@@ -40,7 +40,7 @@ def objective():
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = PanopticonUNet(num_classes=3).to(device)
-    # model.load_state_dict(torch.load("models/transform_augmentation/5dded9e090db4614830145f260aa5376/30.pth", map_location=device))
+    model.load_state_dict(torch.load("models/increasing_data/c78b18c2626b48c8b07892cb2eafde4c/50.pth", map_location=device))
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=parameters["lr"], weight_decay=parameters["weight_decay"])
     # scheduler = CosineAnnealingLR(optimizer, T_max=30, eta_min=0.00005)
@@ -52,6 +52,7 @@ def objective():
     with mlflow.start_run(nested=True) as run:
         for k, v in parameters.items():
             mlflow.log_param(k, v)
+        best_val_loss = float('inf')
 
         for epoch in range(parameters['epochs']):
 
@@ -109,10 +110,6 @@ def objective():
             recall = recall_score(targets_flat, preds_flat, average=None, zero_division=0)
             accuracy = accuracy_score(targets_flat, preds_flat)
 
-            # signature = infer_signature(input_example.numpy(), outputs.detach().cpu().numpy())
-            # model_info = mlflow.pytorch.log_model(model, "model", registered_model_name="PanopticonUNet", signature=signature)
-            # Log classwise metrics
-
             mlflow.log_metric("val_loss", val_loss, step=epoch)
             mlflow.log_metric("train_loss", train_loss, step=epoch)
 
@@ -135,17 +132,20 @@ def objective():
 
             print(f"Current: Learning rate = {lr:.6f}")
             if (epoch+1) % 10 == 0:
-                # Save model checkpoint
-                # mlflow.pytorch.log_mosdel(model, artifact_path=f"model_epoch_{epoch}")
                 print(f"Saving model at epoch {epoch+1}...")
-                # Save the model state_dict
                 model_dir = Path(f"models/{experiment_name}/{run.info.run_id}")
                 model_dir.mkdir(parents=True, exist_ok=True)
                 model_path = model_dir / f"{epoch+1}.pth"
                 torch.save(model.state_dict(), model_path)
 
-            # mlflow.log_param("model_path", model_path)
-        # mlflow.pytorch.log_model(model, artifact_path="model")
+            if best_val_loss > val_loss and epoch+1 > 3:
+                print(f"Saving best model at epoch {epoch+1}...")
+                model_dir = Path(f"models/{experiment_name}/{run.info.run_id}/best")
+                model_dir.mkdir(parents=True, exist_ok=True)
+                model_path = model_dir /f"{epoch+1}.pth"
+                torch.save(model.state_dict(), model_path)
+                best_val_loss = val_loss
+
     return val_loss
 
 if __name__ == "__main__":
